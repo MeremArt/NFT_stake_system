@@ -70,3 +70,65 @@ pub token_program: Program<'info, Token>,
 pub metadata_program: Program<'info, Metadata>,
 
 }
+
+impl<'info> Unstake<'info> {
+    pub fn  unstake (&mut self) ->  Result<()>{
+        let current_time = Clock::get()?.unix_timestamp;
+        let time_elapsed = ((current_time - self.stake_account.staked_at) / 86400) as u32;
+
+        // Ensure the freeze period has passed
+        if time_elapsed < self.config.freeze_period {
+            return Err(StakeError::FreezePeriodNotPassed.into());
+        }
+        self.user_account.points += time_elapsed as u32 * self.config.points_per_stake as u32;
+
+        let seeds = &[
+            b"stake",
+            self.mint.to_account_info().key.as_ref(),
+            self.config.to_account_info().key.as_ref(),
+            &[self.stake_account.bump]
+        ];     
+        let signer_seeds = &[&seeds[..]];
+        let seeds = &[
+            b"stake",
+            self.mint.to_account_info().key.as_ref(),
+            self.config.to_account_info().key.as_ref(),
+            &[self.stake_account.bump]
+        ];     
+        let signer_seeds = &[&seeds[..]];
+
+        let delegate = &self.stake_account.to_account_info();
+        let token_account = &self.mint_ata.to_account_info();
+        let edition = &self.edition.to_account_info();
+        let mint = &self.mint.to_account_info();
+        let token_program = &self.token_program.to_account_info();
+        let metadata_program = &self.metadata_program.to_account_info();
+        
+        ThawDelegatedAccountCpi::new(
+            metadata_program,
+            ThawDelegatedAccountCpiAccounts {
+                delegate,
+                token_account,
+                edition,
+                mint,
+                token_program,
+            }
+        ).invoke_signed(signer_seeds)?;
+
+        let cpi_program = self.token_program.to_account_info();
+
+        let cpi_accounts = Revoke {
+            source: self.mint_ata.to_account_info(),
+            authority: self.user.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+
+        revoke(cpi_ctx)?;
+
+        self.user_account.amount_staked -= 1;
+        
+        Ok(())
+
+    }
+}

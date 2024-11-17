@@ -7,4 +7,6 @@ pub enum StakeError{
     MaxStakeReached,
     #[msg("Freeze period did not pass!")]
     FreezePeriodNotPassed,
+    #[msg("Timestamp error!")]
+    TimestampErr
 }
