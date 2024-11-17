@@ -4,5 +4,7 @@ use anchor_lang::error_code;
 
 pub enum StakeError{
     #[msg("Max stake reached")]
-    MaxStakeReached
+    MaxStakeReached,
+    #[msg("Freeze period did not pass!")]
+    FreezePeriodNotPassed,
 }
